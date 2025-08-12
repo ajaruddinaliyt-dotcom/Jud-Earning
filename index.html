@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon App Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        /* --- Global Styles --- */
+        :root {
+            --purple: #9f00ff; --pink: #ff00ff; --cyan: #00ffff;
+            --dark-bg: #0e0e0e; --box-bg: rgba(20, 20, 30, 0.5);
+            --border-color: rgba(255, 255, 255, 0.2);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--dark-bg);
+            background-image: radial-gradient(circle at top left, rgba(159, 0, 255, 0.2), transparent 30%), radial-gradient(circle at bottom right, rgba(0, 255, 255, 0.2), transparent 30%);
+            color: #fff; min-height: 100vh; background-attachment: fixed;
+        }
+        .hidden { display: none !important; }
+        h1, h2 {
+            background: linear-gradient(90deg, var(--pink), var(--purple), var(--cyan));
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 1.5rem; text-align: center;
+        }
+        .glass-box {
+            background: var(--box-bg); backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px); border-radius: 25px;
+            border: 1px solid var(--border-color); padding: 2rem; margin-bottom: 2rem;
+        }
+        .btn {
+            padding: 12px 28px; border-radius: 50px; font-family: 'Poppins', sans-serif;
+            font-weight: 700; cursor: pointer; transition: all 0.2s ease;
+            text-transform: uppercase; border: none; width: 100%;
+        }
+        .btn:hover:not(:disabled) { transform: scale(1.05); }
+        .btn:disabled {
+            cursor: not-allowed; opacity: 0.5; background-image: none;
+            background-color: #555; box-shadow: none;
+        }
+        .btn-solid { background: linear-gradient(90deg, var(--purple), var(--pink)); color: white; box-shadow: 0 0 15px rgba(255, 0, 255, 0.3); }
+        .btn-outline { background: transparent; color: var(--cyan); border: 2px solid var(--cyan); box-shadow: 0 0 10px rgba(0, 255, 255, 0.3), inset 0 0 10px rgba(0, 255, 255, 0.2); }
+        .btn-danger { background: transparent; color: #ff4757; border: 2px solid #ff4757; box-shadow: 0 0 10px rgba(255, 71, 87, 0.3), inset 0 0 10px rgba(255, 71, 87, 0.2); }
+        input, textarea, select {
+            width: 100%; padding: 15px; margin-bottom: 1rem;
+            background: rgba(0,0,0,0.4); border-radius: 15px;
+            border: 1px solid var(--border-color); color: #fff;
+            font-family: 'Poppins', sans-serif; font-size: 1rem;
+        }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 15px rgba(0, 255, 255, 0.5); }
+        textarea { min-height: 150px; resize: vertical; }
+
+        /* --- USER PANEL STYLES --- */
+        #user-view .page-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+        #user-view .page-view { padding-top: 90px; }
+        #user-view .main-header {
+            position: fixed; top: 0; left: 0; width: 100%; display: flex;
+            align-items: center; justify-content: space-between; padding: 1rem 2rem;
+            background: rgba(14, 14, 14, 0.8); backdrop-filter: blur(10px); z-index: 100;
+            border-bottom: 1px solid var(--border-color); flex-wrap: wrap; gap: 1rem;
+        }
+        #user-view .header-title { font-size: 1.5rem; margin: 0; }
+        #user-view .header-controls { display: flex; align-items: center; gap: 1.5rem; }
+        #user-view .wallet-display { font-size: 1rem; font-weight: 700; color: var(--cyan); text-shadow: 0 0 5px var(--cyan); }
+        #user-view .menu-icon { font-size: 2rem; cursor: pointer; }
+        #user-view #side-menu {
+            position: fixed; top: 0; left: 0; height: 100%; width: 280px;
+            background: #111; z-index: 1000; transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out; padding: 2rem;
+            border-right: 1px solid var(--border-color);
+        }
+        #user-view #side-menu.open { transform: translateX(0); }
+        #user-view .close-menu-btn { position: absolute; top: 1rem; right: 1.5rem; font-size: 2.5rem; cursor: pointer; color: white; }
+        #user-view #side-menu ul { list-style: none; margin-top: 4rem; }
+        #user-view #side-menu ul li a { display: block; padding: 1rem 0; color: white; text-decoration: none; font-size: 1.2rem; border-bottom: 1px solid var(--border-color); transition: color 0.2s; }
+        #user-view #side-menu ul li a:hover { color: var(--cyan); }
+        #user-view .centered-form-container { display: flex; justify-content: center; align-items: center; padding: 2rem 1rem; }
+        #user-view .filters-container { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        #user-view .filters-container .filter-btn { padding: 10px 25px; border-radius: 50px; cursor: pointer; background: transparent; color: var(--cyan); border: 1px solid var(--cyan); }
+        #user-view .filters-container .filter-btn:hover, #user-view .filters-container .filter-btn.active { background: var(--cyan); color: var(--dark-bg); box-shadow: 0 0 15px rgba(0, 255, 255, 0.5); }
+        #user-view #search-bar { max-width: 400px; margin: 0 auto 2rem auto; display: block; }
+        #user-view #items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
+        #user-view .item-card { overflow: hidden; display: flex; flex-direction: column; }
+        #user-view .item-card-logo { width: 100%; height: 180px; background-size: cover; background-position: center; border-bottom: 1px solid var(--border-color); }
+        #user-view .item-card-content { padding: 1.5rem; display: flex; flex-direction: column; flex-grow: 1; }
+        #user-view .item-card-content h3 { margin-bottom: 0.5rem; flex-grow: 1; }
+        #user-view .rating-stars { color: #ccc; cursor: pointer; font-size: 1.5rem; margin-bottom: 1rem; }
+        #user-view .rating-stars.rated { color: var(--purple); cursor: default; }
+        #user-view #wallet-view .glass-box { text-align: center; }
+        #user-view #wallet-balance { font-size: 3.5rem; font-weight: 700; margin-bottom: 1rem; background: linear-gradient(90deg, var(--cyan), #fff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        #user-view .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.9); z-index: 2000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(8px); }
+        #user-view #play-modal iframe { width: 100%; height: 100%; border: none; }
+        #user-view .modal-overlay .close-modal-btn { position: absolute; top: 20px; right: 30px; font-size: 3rem; color: white; cursor: pointer; z-index: 2001; text-shadow: 0 0 10px black; }
+        #user-view #payment-modal .glass-box { max-width: 450px; text-align: center; }
+        #user-view #payment-qr-code, #user-view #payment-upi-id { display: none; }
+        #user-view #notification-toast { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); background: linear-gradient(90deg, var(--purple), var(--cyan)); color: white; padding: 1rem 2rem; border-radius: 15px; z-index: 3000; transition: bottom 0.5s ease-in-out; box-shadow: 0 0 20px rgba(0, 255, 255, 0.5); text-align: center; }
+        #user-view #notification-toast.show { bottom: 20px; }
+
+        /* --- ADMIN PANEL STYLES --- */
+        #admin-view .container { max-width: 1400px; margin: 2rem auto; padding: 1rem; }
+        #admin-view .auth-container { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+        #admin-view .auth-box { width: 100%; max-width: 450px; }
+        #admin-view .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding: 1rem; flex-wrap: wrap; }
+        #admin-view .dashboard-header h1 { margin-bottom: 0; text-align: left; }
+        #admin-view .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        @media (max-width: 992px) { #admin-view .dashboard-grid { grid-template-columns: 1fr; } }
+        #admin-view #dashboard-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        #admin-view .stat-card { text-align: center; padding: 1.5rem; }
+        #admin-view .stat-card h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--cyan); text-transform: uppercase; }
+        #admin-view .stat-card p { font-size: 2.5rem; font-weight: 700; }
+        #admin-view .list-item { background: rgba(0,0,0,0.2); padding: 1.2rem; border-radius: 15px; border-left: 3px solid var(--purple); margin-bottom: 1rem; }
+        #admin-view .list-item h3 { margin-bottom: 0.5rem; color: var(--cyan); }
+        #admin-view .list-item p { margin-bottom: 0.5rem; font-size: 0.9rem; opacity: 0.8; }
+        #admin-view .item-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+        #admin-view .item-actions .btn { padding: 8px 15px; font-size: 0.8rem; }
+        #admin-view .search-input { margin-bottom: 1.5rem; }
+    </style>
+</head>
+<body>
+
+    <!-- USER INTERFACE (Default View) -->
+    <div id="user-view">
+        <header class="main-header">
+            <h1 class="header-title">Neon App Hub</h1>
+            <div class="header-controls">
+                <div id="wallet-display" class="wallet-display">Connecting...</div>
+                <span class="menu-icon" id="open-menu-btn">&#9776;</span>
+            </div>
+        </header>
+
+        <nav id="side-menu">
+            <span class="close-menu-btn" id="close-menu-btn-nav">&times;</span>
+            <ul>
+                <li><a href="#home" class="nav-link">Home</a></li>
+                <li><a href="#wallet" class="nav-link">My Wallet</a></li>
+                <li><a href="#profile" class="nav-link">User Profile</a></li>
+                <li><a href="#upload" class="nav-link">Upload App/Game</a></li>
+                <li><a href="#admin">Admin Panel</a></li>
+            </ul>
+        </nav>
+        
+        <div class="page-container">
+            <div id="home-view" class="page-view">
+                 <div class="filters-container">
+                    <input type="search" id="search-bar" placeholder="Search by title...">
+                    <div>
+                        <button class="filter-btn active" data-filter="All">All</button>
+                        <button class="filter-btn" data-filter="App">Apps</button>
+                        <button class="filter-btn" data-filter="Game">Games</button>
+                    </div>
+                </div>
+                <div id="items-grid"></div>
+            </div>
+            
+            <div id="wallet-view" class="page-view hidden">
+                <div class="centered-form-container">
+                    <div class="glass-box">
+                        <h2>My Wallet</h2>
+                        <p style="opacity: 0.8; margin-bottom: 1.5rem;">Your current account balance.</p>
+                        <div id="wallet-balance">₹0.00</div>
+                        <button id="add-money-btn" class="btn btn-outline" style="width: auto; padding: 12px 30px;" disabled>Add Money</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="profile-view" class="page-view hidden">
+                <div class="centered-form-container">
+                    <div class="glass-box">
+                        <h2>User Profile</h2>
+                        <p style="opacity: 0.8; margin-bottom: 1rem;">This information is required to submit an app or game for review.</p>
+                        <form id="profile-form">
+                            <input type="text" id="profile-name" placeholder="Your Name" required>
+                            <input type="email" id="profile-email" placeholder="Your Email" required>
+                            <button type="submit" id="save-profile-btn" class="btn btn-solid" disabled>Save Profile</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div id="upload-view" class="page-view hidden">
+                <div class="centered-form-container">
+                    <div class="glass-box">
+                        <h2>Submit for Review</h2>
+                        <form id="upload-form">
+                            <textarea id="upload-html" placeholder="Paste your full HTML code here..." required></textarea>
+                            <input type="text" id="upload-title" placeholder="Title of your App/Game" required>
+                            <input type="url" id="upload-logo" placeholder="Logo Image URL (https://...)" required>
+                            <select id="upload-type" required>
+                                <option value="" disabled selected>Select Type...</option>
+                                <option value="App">App</option>
+                                <option value="Game">Game</option>
+                            </select>
+                            <button type="submit" id="submit-upload-btn" class="btn btn-solid" disabled>Submit for Review</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="play-modal" class="modal-overlay hidden">
+            <span class="close-modal-btn" id="close-play-modal-btn">&times;</span>
+            <iframe id="play-iframe" srcdoc=""></iframe>
+        </div>
+        
+        <div id="payment-modal" class="modal-overlay hidden">
+            <div class="glass-box">
+                <span class="close-modal-btn" id="close-payment-modal-btn">&times;</span>
+                <h2>Add Money to Wallet</h2>
+                <p style="opacity: 0.8;">Enter amount and pay with any UPI app.</p>
+                <img id="payment-qr-code" alt="UPI QR Code">
+                <p id="payment-upi-id"></p>
+                <form id="payment-form">
+                    <input type="number" id="payment-amount" placeholder="Enter amount (e.g., 100)" min="1" required>
+                    <button type="submit" class="btn btn-solid">Pay Now</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="notification-toast"></div>
+    </div>
+
+
+    <!-- ADMIN INTERFACE (Initially Hidden) -->
+    <div id="admin-view" class="hidden">
+        <div id="auth-container" class="auth-container">
+            <div class="glass-box auth-box">
+                <h1>Admin Login</h1>
+                <form id="login-form">
+                    <input type="email" id="login-email" name="email" placeholder="Email" required>
+                    <input type="password" id="login-password" name="password" placeholder="Password" required>
+                    <button type="submit" class="btn btn-solid" style="width: 100%;">Login</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="dashboard-container" class="container hidden">
+            <header class="dashboard-header">
+                <h1>Admin Dashboard</h1>
+                <button id="logout-btn" class="btn btn-outline">Logout</button>
+            </header>
+
+            <section id="dashboard-stats" class="glass-box"></section>
+
+            <div class="dashboard-grid">
+                <section id="form-section" class="glass-box">
+                    <h2 id="form-title-heading">Add New Item</h2>
+                    <form id="add-edit-form">
+                        <input type="hidden" id="edit-id"> <input type="hidden" id="pending-id"> <input type="hidden" id="user-email">
+                        <input type="text" id="form-title-input" placeholder="Title" required>
+                        <input type="text" id="form-logo-url" placeholder="Logo URL" required>
+                        <select id="form-type" required> <option value="App">App</option> <option value="Game">Game</option> </select>
+                        <textarea id="form-html-code" placeholder="HTML Code" required></textarea>
+                        <button type="submit" id="submit-btn" class="btn btn-solid" style="width: 100%;">Publish Item</button>
+                        <button type="button" id="cancel-btn" class="btn btn-danger hidden" style="width: 100%; margin-top: 1rem;">Cancel Edit</button>
+                    </form>
+                </section>
+                
+                <section id="pending-section" class="glass-box">
+                    <h2>Pending Submissions</h2>
+                    <div id="pending-list"></div>
+                </section>
+            </div>
+            
+            <section id="published-section" class="glass-box">
+                <h2>Published Items</h2>
+                <input type="search" id="published-search" class="search-input" placeholder="Search by title...">
+                <div id="published-list"></div>
+            </section>
+
+            <section id="users-section" class="glass-box">
+                <h2>User Management</h2>
+                <input type="search" id="users-search" class="search-input" placeholder="Search by name or email...">
+                <div id="users-list"></div>
+            </section>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Single Configuration for Both Panels ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBVa4ZMb-pMk0kJOQfKMnzBdz1swupAiBo",
+            authDomain: "gaming-earning-ad4d2.firebaseapp.com",
+            projectId: "gaming-earning-ad4d2",
+            databaseURL: "https://gaming-earning-ad4d2-default-rtdb.firebaseio.com",
+            storageBucket: "gaming-earning-ad4d2.appspot.com",
+            messagingSenderId: "562857232662",
+            appId: "1:562857232662:web:a06f27d0c794f597aae837",
+            measurementId: "G-XLK5GZK38S"
+        };
+        
+        // --- App Initializer ---
+        function initializeApp() {
+            const userView = document.getElementById('user-view');
+            const adminView = document.getElementById('admin-view');
+            
+            if (window.location.hash === '#admin') {
+                userView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                initAdminPanel();
+            } else {
+                adminView.classList.add('hidden');
+                userView.classList.remove('hidden');
+                initUserPanel();
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+        // --- USER PANEL LOGIC ---
+        function initUserPanel() {
+            if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+            const auth = firebase.auth();
+            const db = firebase.database();
+
+            let allItems = [], currentFilter = 'All', currentUser = null;
+
+            const D = (id) => document.querySelector(`#user-view #${id}`);
+            const views = { home: D('home-view'), profile: D('profile-view'), upload: D('upload-view'), wallet: D('wallet-view') };
+            const sideMenu = D('side-menu'), itemsGrid = D('items-grid'), searchBar = D('search-bar');
+            const playModal = D('play-modal'), playIframe = D('play-iframe'), paymentModal = D('payment-modal');
+            const walletDisplay = D('wallet-display'), walletBalance = D('wallet-balance'), addMoneyBtn = D('add-money-btn'), paymentForm = D('payment-form');
+            
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    currentUser = user;
+                    setupUserListeners(user.uid);
+                    D('add-money-btn').disabled = false; D('save-profile-btn').disabled = false; D('submit-upload-btn').disabled = false;
+                } else { auth.signInAnonymously().catch(e => console.error("Anonymous sign-in failed:", e)); }
+            });
+
+            function setupUserListeners(uid) {
+                db.ref('users/' + uid).on('value', s => {
+                    const profile = s.val()?.profile || {}, balance = s.val()?.walletBalance || 0;
+                    D('profile-name').value = profile.name || ''; D('profile-email').value = profile.email || '';
+                    walletDisplay.textContent = `Balance: ₹${balance.toFixed(2)}`; walletBalance.textContent = `₹${balance.toFixed(2)}`;
+                    if (profile.email) setupNotificationListener(profile.email);
+                });
+            }
+
+            function showView(viewName) { Object.values(views).forEach(v => v.classList.add('hidden')); if(views[viewName]) views[viewName].classList.remove('hidden'); sideMenu.classList.remove('open'); window.scrollTo(0, 0); }
+            
+            D('open-menu-btn').addEventListener('click', () => sideMenu.classList.add('open'));
+            D('close-menu-btn-nav').addEventListener('click', () => sideMenu.classList.remove('open'));
+            document.querySelectorAll('#user-view .nav-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault(); const viewName = e.target.getAttribute('href').substring(1);
+                    if (viewName === 'admin') { window.location.hash = '#admin'; location.reload(); } else { showView(viewName); }
+                });
+            });
+
+            D('profile-form').addEventListener('submit', e => {
+                e.preventDefault(); if (!currentUser) return alert('Connecting...');
+                db.ref('users/' + currentUser.uid + '/profile').set({ name: D('profile-name').value, email: D('profile-email').value }).then(() => { alert('Profile saved!'); showView('home'); });
+            });
+
+            function renderItems() {
+                itemsGrid.innerHTML = '';
+                const filtered = allItems.filter(item => (currentFilter === 'All' || item.type === currentFilter) && item.title.toLowerCase().includes(searchBar.value.toLowerCase()));
+                if (filtered.length === 0) { itemsGrid.innerHTML = '<p style="grid-column: 1 / -1; text-align: center;">No items found.</p>'; return; }
+                filtered.forEach(item => {
+                    const card = document.createElement('div'); card.className = 'item-card glass-box';
+                    const isRated = JSON.parse(localStorage.getItem('ratedItems') || '{}')[item.id];
+                    card.innerHTML = `<div class="item-card-logo" style="background-image: url('${item.logoUrl}')"></div> <div class="item-card-content"> <h3>${item.title}</h3> <div class="rating-stars ${isRated ? 'rated' : ''}" data-item-id="${item.id}"> ${[1,2,3,4,5].map(i => `<span data-value="${i}">${i <= Math.round(item.rating || 0) ? '★' : '☆'}</span>`).join('')} </div> <div class="btn btn-outline play-btn" data-item-id="${item.id}" style="width: auto; padding: 10px 25px; margin: 0 auto;">Play</div> </div>`;
+                    itemsGrid.appendChild(card);
+                });
+            }
+            
+            db.ref('items').on('value', s => { allItems = []; s.forEach(cs => allItems.push({ id: cs.key, ...cs.val() })); allItems.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); renderItems(); });
+            document.querySelectorAll('#user-view .filter-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelector('#user-view .filter-btn.active').classList.remove('active'); btn.classList.add('active'); currentFilter = btn.dataset.filter; renderItems(); }));
+            searchBar.addEventListener('input', renderItems);
+            itemsGrid.addEventListener('click', e => { if (e.target.classList.contains('play-btn')) { const item = allItems.find(i => i.id === e.target.dataset.itemId); if (item) { playIframe.srcdoc = `<style>html, body { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; } * { box-sizing: border-box; }</style>${item.htmlCode}`; playModal.classList.remove('hidden'); } } });
+            D('close-play-modal-btn').addEventListener('click', () => { playModal.classList.add('hidden'); playIframe.srcdoc = ''; });
+            addMoneyBtn.addEventListener('click', () => { if (currentUser) paymentModal.classList.remove('hidden'); else alert('Connecting...'); });
+            D('close-payment-modal-btn').addEventListener('click', () => paymentModal.classList.add('hidden'));
+
+            paymentForm.addEventListener('submit', e => {
+                e.preventDefault(); if (!currentUser) return alert('Auth Error.');
+                const amount = D('payment-amount').value;
+                if (!amount || isNaN(amount) || amount < 1) { return alert('Please enter a valid amount.'); }
+                const upiUrl = `upi://pay?pa=ajaruddinytbusiness1@oksbi&pn=NeonAppHub&am=${amount}&cu=INR&tn=AddFunds`;
+                window.location.href = upiUrl;
+                db.ref('users/' + currentUser.uid + '/walletBalance').transaction(bal => (bal || 0) + parseFloat(amount));
+                paymentModal.classList.add('hidden');
+                alert("Opening your UPI app... Your wallet will be updated.");
+            });
+            showView('home');
+        }
+
+        // --- ADMIN PANEL LOGIC (COMPLETE) ---
+        function initAdminPanel() {
+            const adminApp = firebase.apps.find(app => app.name === 'adminApp') || firebase.initializeApp(firebaseConfig, 'adminApp');
+            const adminAuth = adminApp.auth(); const adminDB = adminApp.database();
+            const D = (id) => document.querySelector(`#admin-view #${id}`);
+            const authCont = D('auth-container'), dashCont = D('dashboard-container'), loginForm = D('login-form');
+            const statsCont = D('dashboard-stats'), pendingList = D('pending-list'), publishedList = D('published-list'), usersList = D('users-list');
+            const addEditForm = D('add-edit-form'), formTitle = D('form-title-heading'), submitBtn = D('submit-btn'), cancelBtn = D('cancel-btn');
+            const editId = D('edit-id'), pendingId = D('pending-id'), userEmail = D('user-email'), titleIn = D('form-title-input'), logoIn = D('form-logo-url'), typeIn = D('form-type'), htmlIn = D('form-html-code');
+            const pubSearch = D('published-search'), userSearch = D('users-search');
+            let allPubItems = [], allUsers = [];
+
+            adminAuth.onAuthStateChanged(user => { if (user) { authCont.classList.add('hidden'); dashCont.classList.remove('hidden'); loadAllData(); } else { authCont.classList.remove('hidden'); dashCont.classList.add('hidden'); } });
+            function loadAllData() {
+                const p = [adminDB.ref('items').once('value'), adminDB.ref('pendingSubmissions').once('value'), adminDB.ref('users').once('value')];
+                Promise.all(p).then(s => { statsCont.innerHTML = `<div class="stat-card glass-box"><h3>Published</h3><p>${s[0].numChildren()}</p></div> <div class="stat-card glass-box"><h3>Pending</h3><p>${s[1].numChildren()}</p></div> <div class="stat-card glass-box"><h3>Users</h3><p>${s[2].numChildren()}</p></div>`; });
+                adminDB.ref('pendingSubmissions').on('value', s => { pendingList.innerHTML = ''; if (!s.exists()) { pendingList.innerHTML = '<p>None.</p>'; return; } s.forEach(cs => { const sub = cs.val(); pendingList.innerHTML += `<div class="list-item"><h3>${sub.title}</h3><p>By: ${sub.userInfo?.name || 'N/A'}</p><div class="item-actions"><button class="btn btn-outline" onclick="adminActions.approve('${cs.key}')">Approve</button><button class="btn btn-danger" onclick="adminActions.reject('${cs.key}')">Reject</button></div></div>`; }); });
+                adminDB.ref('items').on('value', s => { allPubItems = []; s.forEach(cs => allPubItems.push({ id: cs.key, ...cs.val() })); allPubItems.reverse(); renderPublished(); });
+                adminDB.ref('users').on('value', s => { allUsers = []; s.forEach(cs => allUsers.push({ id: cs.key, ...cs.val() })); renderUsers(); });
+            }
+            function renderPublished() {
+                publishedList.innerHTML = ''; const q = pubSearch.value.toLowerCase();
+                const f = allPubItems.filter(i => i.title.toLowerCase().includes(q)); if(f.length===0){publishedList.innerHTML = '<p>None found.</p>'; return;}
+                f.forEach(i => { publishedList.innerHTML += `<div class="list-item"><h3>${i.title}</h3><p>Type: ${i.type}</p><div class="item-actions"><button class="btn btn-outline" onclick="adminActions.edit('${i.id}')">Edit</button><button class="btn btn-danger" onclick="adminActions.del('${i.id}')">Delete</button></div></div>`; });
+            }
+            function renderUsers() {
+                usersList.innerHTML = ''; const q = userSearch.value.toLowerCase();
+                const f = allUsers.filter(u => u.profile?.name?.toLowerCase().includes(q) || u.profile?.email?.toLowerCase().includes(q)); if(f.length===0){usersList.innerHTML = '<p>None found.</p>'; return;}
+                f.forEach(u => { usersList.innerHTML += `<div class="list-item"><h3>${u.profile?.name || 'N/A'}</h3><p>${u.profile?.email || 'N/A'}</p><p>Wallet: ₹${(u.walletBalance || 0).toFixed(2)}</p></div>`; });
+            }
+            loginForm.addEventListener('submit', e => { e.preventDefault(); adminAuth.signInWithEmailAndPassword(loginForm.email.value, loginForm.password.value).catch(err => alert(err.message)); });
+            D('logout-btn').addEventListener('click', () => adminAuth.signOut());
+            cancelBtn.addEventListener('click', () => resetForm());
+            pubSearch.addEventListener('input', renderPublished);
+            userSearch.addEventListener('input', renderUsers);
+            addEditForm.addEventListener('submit', e => {
+                e.preventDefault(); const d = { title: titleIn.value, logoUrl: logoIn.value, type: typeIn.value, htmlCode: htmlIn.value };
+                if (editId.value) { adminDB.ref('items/' + editId.value).update(d).then(() => { alert('Updated!'); resetForm(); }); } 
+                else {
+                    d.createdAt = firebase.database.ServerValue.TIMESTAMP; d.rating = 0; d.ratingCount = 0;
+                    adminDB.ref('items').push(d).then(() => {
+                        if (pendingId.value) {
+                            if (userEmail.value) { adminDB.ref(`notifications/${userEmail.value.replace(/[.#$[\]]/g, "_")}`).push({ message: `Submission "${d.title}" approved!` }); }
+                            adminDB.ref(`pendingSubmissions/${pendingId.value}`).remove();
+                        }
+                        alert('Published!'); resetForm(); loadAllData();
+                    });
+                }
+            });
+            function resetForm() { addEditForm.reset(); D('edit-id').value = ''; D('pending-id').value = ''; D('user-email').value = ''; formTitle.textContent = 'Add New Item'; submitBtn.textContent = 'Publish Item'; cancelBtn.classList.add('hidden'); }
+            window.adminActions = {
+                approve: key => { adminDB.ref(`pendingSubmissions/${key}`).once('value', s => { const d = s.val(); formTitle.textContent = 'Approve'; submitBtn.textContent = 'Approve & Publish'; D('pending-id').value = key; D('user-email').value = d.userInfo?.email; titleIn.value = d.title; logoIn.value = d.logoUrl; typeIn.value = d.type; htmlIn.value = d.htmlCode; cancelBtn.classList.remove('hidden'); window.scrollTo(0, 0); }); },
+                edit: key => { adminDB.ref(`items/${key}`).once('value', s => { const d = s.val(); formTitle.textContent = 'Edit Item'; submitBtn.textContent = 'Update Item'; D('edit-id').value = key; titleIn.value = d.title; logoIn.value = d.logoUrl; typeIn.value = d.type; htmlIn.value = d.htmlCode; cancelBtn.classList.remove('hidden'); window.scrollTo(0, 0); }); },
+                reject: key => { if(confirm('Sure?')) adminDB.ref(`pendingSubmissions/${key}`).remove().then(loadAllData); },
+                del: key => { if(confirm('Sure?')) adminDB.ref(`items/${key}`).remove().then(loadAllData); }
+            };
+        }
+    </script>
+</body>
+</html>

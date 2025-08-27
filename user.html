@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Panel</title>
+  <style>
+    body { margin:0; font-family: Arial, sans-serif; background:#f1f5f9; overflow-x:hidden; }
+    .header { background:#03a9f4; color:#fff; padding:15px; display:flex; justify-content:space-between; align-items:center; font-size:20px; font-weight:bold; }
+    .menu-btn { font-size:26px; cursor:pointer; }
+    .sidebar { height:100%; width:0; position:fixed; top:0; left:0; background:#fff; box-shadow:2px 0 6px rgba(0,0,0,.2); overflow-x:hidden; transition:.3s; padding-top:60px; z-index:1000; }
+    .sidebar a { padding:12px 20px; text-decoration:none; font-size:16px; color:#333; display:block; transition:.2s; border-bottom:1px solid #eee; }
+    .sidebar a:hover { background:#f1f1f1; }
+    .close-btn { position:absolute; top:15px; right:20px; font-size:26px; cursor:pointer; color:#333; }
+    .info-box { background:#fff; margin:15px; padding:15px; border-radius:12px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,.1); }
+    .info-box span { color:red; font-weight:bold; }
+    .btn { display:inline-block; background:#03a9f4; color:#fff; padding:8px 15px; border-radius:20px; margin:8px 5px; text-decoration:none; font-size:14px; }
+    .stats { display:grid; grid-template-columns:1fr; gap:10px; margin:15px; }
+    .stat-card { background:#fff; padding:12px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,.1); font-size:15px; }
+    .stat-card b { float:right; }
+    .form-box { background:#fff; margin:15px; padding:15px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.1); }
+    .form-box h3 { margin-top:0; font-size:18px; }
+    label { font-weight:bold; display:block; margin-top:12px; }
+    input, select { box-sizing: border-box; width:100%; padding:10px; margin-top:6px; border:1px solid #ccc; border-radius:8px; font-size:15px; }
+    input[readonly]{ background:#f9f9f9; }
+    .submit-btn { width:100%; margin-top:18px; padding:12px; background:#03a9f4; color:#fff; font-size:16px; border:none; border-radius:8px; cursor:pointer; }
+    .submit-btn:hover { background:#0288d1; }
+    .whatsapp-btn { position:fixed; width:55px; height:55px; bottom:20px; right:20px; background:#25D366; color:#fff; border-radius:50%; text-align:center; font-size:28px; box-shadow:0 4px 8px rgba(0,0,0,.3); z-index:9999; line-height:55px; text-decoration:none; }
+    .whatsapp-btn:hover { background:#20b954; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    FAMECITY
+    <span class="menu-btn" onclick="openMenu()">☰</span>
+  </div>
+
+  <!-- Sidebar Menu -->
+  <div id="sidebar" class="sidebar">
+    <span class="close-btn" onclick="closeMenu()">×</span>
+    <a href="#">🏠 Dashboard</a>
+    <a href="#">📦 My Orders</a>
+    <a href="#">💰 Add Balance</a>
+    <a href="#">⚙️ Settings</a>
+    <a href="#">🚪 Logout</a>
+  </div>
+
+  <!-- Home Screen -->
+  <div id="home">
+    <!-- Info -->
+    <div class="info-box" id="infoBox">
+      We Have Enable <span>2% Bonus</span> On <span>Payments</span><br/>
+      <a id="btnAddBalance" href="#" class="btn">Add Balance</a>
+      <a id="btnJoinGroup" href="#" class="btn">Join Group</a>
+    </div>
+
+    <!-- Stats (static placeholders — unchanged visually) -->
+    <div class="stats">
+      <div class="stat-card">Total Spent <b id="totalSpent">₹1769.89</b></div>
+      <div class="stat-card">Panel Orders <b id="panelOrders">1016425</b></div>
+      <div class="stat-card">Total Balance <b id="totalBalance">₹1.19</b></div>
+    </div>
+
+    <!-- Place New Order -->
+    <div class="form-box">
+      <h3>📦 Place New Order</h3>
+
+      <label>🔍 Search</label>
+      <input type="text" id="search" placeholder="Search service..." oninput="filterServices()" />
+
+      <label>⚙️ Category</label>
+      <select id="category" onchange="populateServices()"></select>
+
+      <label>📝 Service</label>
+      <select id="service" onchange="updateServiceDetails()"></select>
+
+      <label>⏱ Average Time</label>
+      <input type="text" id="avgTime" readonly />
+
+      <label>💰 Rate (Per 1 Quantity)</label>
+      <input type="text" id="rate" readonly />
+
+      <label>🔗 Link</label>
+      <input type="text" id="link" placeholder="Enter your link" />
+
+      <label>🔢 Enter Quantity</label>
+      <input type="number" id="quantity" value="1000" min="1" oninput="calculateTotal()" />
+
+      <label>💵 Total Price</label>
+      <input type="text" id="totalPrice" readonly />
+
+      <button class="submit-btn" onclick="placeOrder()">🚀 Place Order</button>
+    </div>
+  </div>
+
+  <!-- WhatsApp Floating -->
+  <a id="waFloat" href="#" class="whatsapp-btn" target="_blank">💬</a>
+
+  <!-- Firebase compat SDKs (same as admin) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+  // Sidebar
+  function openMenu(){ document.getElementById("sidebar").style.width = "250px"; }
+  function closeMenu(){ document.getElementById("sidebar").style.width = "0"; }
+
+  /* ========= Firebase Init (same project as Admin) ========= */
+  const firebaseConfig = {
+    apiKey: "AIzaSyA-p2HQH06_G7Pp6UKbMXHhkKewnHjmVB0",
+    authDomain: "smmpanel-3381d.firebaseapp.com",
+    databaseURL: "https://smmpanel-3381d-default-rtdb.firebaseio.com",
+    projectId: "smmpanel-3381d",
+    storageBucket: "smmpanel-3381d.firebasestorage.app",
+    messagingSenderId: "27044073769",
+    appId: "1:27044073769:web:8ea3e64260ef906b082738",
+    measurementId: "G-QDC89MTK05"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  /* ========= Realtime: Settings (WhatsApp / Group) ========= */
+  const btnJoinGroup = document.getElementById("btnJoinGroup");
+  const btnAddBalance = document.getElementById("btnAddBalance");
+  const waFloat = document.getElementById("waFloat");
+
+  db.ref("settings").on("value", snap => {
+    const s = snap.val() || {};
+    // Update buttons if provided in admin Settings
+    if (s.whatsappLink) {
+      btnAddBalance.href = s.whatsappLink;
+      waFloat.href = s.whatsappLink;
+    }
+    if (s.groupLink) {
+      btnJoinGroup.href = s.groupLink;
+    }
+    // Optional: banner/rules text area from admin (kept same visually)
+    if (s.siteTexts && s.siteTexts.banner) {
+      const info = document.getElementById("infoBox");
+      // Put banner line above existing text without changing design
+      if (!document.getElementById("bannerLine")) {
+        const p = document.createElement("div");
+        p.id = "bannerLine";
+        p.style.marginBottom = "6px";
+        p.textContent = s.siteTexts.banner;
+        info.prepend(p);
+      } else {
+        document.getElementById("bannerLine").textContent = s.siteTexts.banner;
+      }
+    }
+  });
+
+  /* ========= Realtime: Services ========= */
+  let servicesData = {};     // populated from Realtime DB
+  let filteredServiceNames = [];
+
+  // Listen once and in realtime for changes done in Admin → Services
+  db.ref("services").on("value", snap => {
+    servicesData = snap.val() || {};
+    populateCategories();
+    populateServices();
+  });
+
+  function populateCategories(){
+    const category = document.getElementById("category");
+    const prev = category.value;
+    category.innerHTML = "";
+    Object.keys(servicesData).forEach(cat=>{
+      const opt = document.createElement("option");
+      opt.value = cat; opt.textContent = cat;
+      category.appendChild(opt);
+    });
+    // keep previous selection if still available
+    if (prev && servicesData[prev]) category.value = prev;
+  }
+
+  function filterServices(){
+    const q = (document.getElementById("search").value || "").toLowerCase();
+    const cat = document.getElementById("category").value;
+    const names = servicesData[cat] ? Object.keys(servicesData[cat]) : [];
+    filteredServiceNames = q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+    populateServices(true);
+  }
+
+  function populateServices(keepCat=false){
+    const category = document.getElementById("category");
+    if (!keepCat) filterServices(); // initialize filtered list based on current search
+    const service = document.getElementById("service");
+    const cat = category.value;
+    service.innerHTML = "";
+    const names = filteredServiceNames.length ? filteredServiceNames :
+      (servicesData[cat] ? Object.keys(servicesData[cat]) : []);
+    names.forEach(name=>{
+      const opt = document.createElement("option");
+      opt.value = name; opt.textContent = name;
+      service.appendChild(opt);
+    });
+    updateServiceDetails();
+  }
+
+  function updateServiceDetails(){
+    const cat=document.getElementById("category").value;
+    const serv=document.getElementById("service").value;
+    if(!servicesData[cat] || !servicesData[cat][serv]) return;
+    const d=servicesData[cat][serv];
+    document.getElementById("avgTime").value = d.time || "";
+    const rate = +d.rate || 0;
+    document.getElementById("rate").value = "₹"+rate.toFixed(2);
+    calculateTotal();
+  }
+
+  function calculateTotal(){
+    const cat=document.getElementById("category").value;
+    const serv=document.getElementById("service").value;
+    if(!servicesData[cat] || !servicesData[cat][serv]) return;
+    const d=servicesData[cat][serv];
+    const qty=parseInt(document.getElementById("quantity").value)||0;
+    const total=d ? qty*(+d.rate||0) : 0;
+    document.getElementById("totalPrice").value="₹"+total.toFixed(2);
+  }
+
+  /* ========= Create Order (goes to Admin → Orders) ========= */
+  function placeOrder(){
+    const cat = document.getElementById("category").value;
+    const serv = document.getElementById("service").value;
+    const link = document.getElementById("link").value.trim();
+    const qty  = parseInt(document.getElementById("quantity").value)||0;
+
+    if(!cat || !serv){ alert("Please select a service."); return; }
+    if(!link){ alert("Please enter your link."); return; }
+    if(qty<=0){ alert("Quantity must be at least 1."); return; }
+
+    const rate = (servicesData[cat] && servicesData[cat][serv]) ? (+servicesData[cat][serv].rate||0) : 0;
+    const amount = +(qty*rate).toFixed(2);
+
+    // Basic anonymous order (no auth) — Admin can edit details later
+    const orderId = "o_"+Date.now();
+    const payload = {
+      user: "guest",         // can be mapped later to real user system if you add auth
+      email: "",
+      category: cat,
+      service: serv,
+      link: link,
+      qty: qty,
+      amount: amount,
+      status: "Pending",
+      time: Date.now()
+    };
+
+    db.ref("orders/"+orderId).set(payload).then(()=>{
+      alert("Order placed! Your order ID: "+orderId);
+      document.getElementById("link").value = "";
+    }).catch(err=>{
+      alert("Failed to place order: "+err.message);
+    });
+  }
+
+  // Load initial state when the page loads (if DB is already present)
+  window.onload = () => {
+    // categories/services will populate as soon as 'services' node arrives
+  };
+</script>
+</body>
+</html>
